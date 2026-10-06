@@ -61,7 +61,14 @@ const ADMIN_EMAIL='pinakinpatel29092000@gmail.com';
 const APP_STATE_ID='bodka-yuva-sena';
 const sb=window.supabase.createClient(SB_URL,SB_KEY);
 let currentAuthUser=null, currentProfile={role:'admin',name:'Mandal Admin'};
-let isHydrating=false, saveTimer=null, persistChain=Promise.resolve(), realtimeChannel=null;
+let isHydrating=false, saveTimer=null, persistChain=Promise.resolve(), realtimeChannel=null, idleLogoutTimer=null;
+const IDLE_LOGOUT_MS=15*60*1000;
+function resetIdleLogoutTimer(){
+  if(idleLogoutTimer)clearTimeout(idleLogoutTimer);
+  if(!currentAuthUser || !state.user)return;
+  idleLogoutTimer=setTimeout(()=>{logout('You were signed out after 15 minutes of inactivity.');},IDLE_LOGOUT_MS);
+}
+['pointerdown','keydown','touchstart','scroll'].forEach(evt=>document.addEventListener(evt,()=>resetIdleLogoutTimer(),{passive:true}));
 const CLIENT_ID=localStorage.getItem('bodka_yuva_sena_client_id') || (()=>{const v=crypto.randomUUID();localStorage.setItem('bodka_yuva_sena_client_id',v);return v;})();
 function save(){
   localStorage.setItem(KEY,JSON.stringify(state));
@@ -137,7 +144,7 @@ async function initializeSharedApp(){
   try{
     const {data,error}=await sb.auth.getSession();
     if(error)throw error;
-    if(data.session)await hydrateSharedState(data.session.user);
+    if(data.session){await hydrateSharedState(data.session.user);state.festival=null;save();render();resetIdleLogoutTimer();}
     else render();
   }catch(err){console.error(err);currentAuthUser=null;isHydrating=false;render();toast('Could not connect to online database. Please sign in again.');}
 }
@@ -213,6 +220,10 @@ async function login(){
     const {data,error}=await sb.auth.signInWithPassword({email:ADMIN_EMAIL,password:p});
     if(error)throw error;
     await hydrateSharedState(data.user);
+    state.festival=null;
+    save();
+    render();
+    resetIdleLogoutTimer();
     toast('Login successful');
   }catch(err){
     console.error(err);currentAuthUser=null;isHydrating=false;
@@ -235,11 +246,13 @@ function renderApp(){
  dashboard();
 }
 function cap(s){return s==='ganesh'?'Ganesh Chaturthi':'Navratri'}
-async function logout(){
+async function logout(reason){
+  if(idleLogoutTimer){clearTimeout(idleLogoutTimer);idleLogoutTimer=null;}
   currentAuthUser=null;
   if(realtimeChannel){await sb.removeChannel(realtimeChannel);realtimeChannel=null;}
   state.user=null;localStorage.setItem(KEY,JSON.stringify(state));render();
   const {error}=await sb.auth.signOut();if(error)console.error(error);
+  if(reason)toast(reason);
 }
 function toggleSide(){let s=$('side'),o=$('sideOverlay');if(!s)return;let opening=!s.classList.contains('open');s.classList.toggle('open');o?.classList.toggle('show');document.body.style.overflow=opening?'hidden':''}
 function closeSide(){$('side')?.classList.remove('open');$('sideOverlay')?.classList.remove('show');document.body.style.overflow=''}
