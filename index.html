@@ -1,1 +1,307 @@
-<!doctype html><html lang="gu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bodka Yuva Sena</title><style>body{font-family:Arial,sans-serif;margin:0;background:#f5f3fa;color:#211b2d}button,input,select,textarea{font:inherit;padding:10px;border:1px solid #ddd;border-radius:8px}button{cursor:pointer}.p{background:#6d3fd1;color:white;border:0}.d{background:#ffecef;color:#b22}.s{background:#e8f7ef;color:#16734d}.card{background:#fff;padding:18px;border-radius:14px;box-shadow:0 3px 15px #0001;margin:12px 0}.wrap{max-width:1200px;margin:auto;padding:18px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.nav{display:flex;gap:8px;flex-wrap:wrap}.table{width:100%;border-collapse:collapse;background:white}.table th,.table td{padding:10px;border-bottom:1px solid #eee;text-align:left}.login{max-width:400px;margin:12vh auto}.top{display:flex;justify-content:space-between;align-items:center;gap:10px}.hide{display:none}.modal{position:fixed;inset:0;background:#0008;display:grid;place-items:center;padding:15px}.box{background:white;padding:22px;border-radius:15px;width:min(620px,100%)}label{display:block;font-weight:bold;margin:9px 0 4px}.form{display:grid;grid-template-columns:1fr 1fr;gap:8px}.full{grid-column:1/-1}.pill{padding:5px 9px;border-radius:20px;background:#eee;font-size:12px}@media(max-width:700px){.grid{grid-template-columns:1fr 1fr}.form{grid-template-columns:1fr}.full{grid-column:auto}.table{min-width:800px}.wrap{padding:10px}}</style></head><body><div id="app"></div><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>const U='https://ztvkybdluwtsxopmpwxq.supabase.co',K='sb_publishable_CwxipNGfHRYaaTkvGkh_GQ_jo-n4oc0',sb=supabase.createClient(U,K);let user=null,festival=null,year=2026,data={income:[],expenses:[]},channel=null;const eid=()=>festival==='navratri'?'1ae039a3-b21b-4b3d-a777-87d83838c592':'8b628047-1c33-4670-86b9-a6eaafaf2ae5',money=n=>new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));function toast(x){alert(x)}function loginView(){app.innerHTML='<div class="login card"><h1>🪔 Bodka Yuva Sena</h1><p>Secure Festival Accounting</p><label>Account</label><input value="Bodka Yuva Sena — Admin" readonly><label>Password</label><input id="pw" type="password" placeholder="Enter password"><button class="p" style="width:100%;margin-top:12px" onclick="login()">Sign In</button><button style="width:100%;margin-top:10px" onclick="forgotPassword()">Forgot Password?</button><p style="font-size:12px;color:#666;text-align:center">Password reset link will be sent to the registered admin email.</p></div>'}async function login(){let p=document.getElementById('pw').value;if(!p)return toast('Enter password');let r=await sb.auth.signInWithPassword({email:'pinakinpatel29092000@gmail.com',password:p});if(r.error)return toast('Incorrect password or account not configured');user=r.data.user;chooseView()}async function forgotPassword(){let r=await sb.auth.resetPasswordForEmail('pinakinpatel29092000@gmail.com',{redirectTo:window.location.origin});if(r.error)return toast('Password reset email could not be sent: '+r.error.message);toast('Password reset link email par mokli didhi chhe. Email ma aaveli link open karo.')}function recoveryView(){app.innerHTML='<div class="login card"><h1>🔐 Set New Password</h1><p>Enter your new Bodka Yuva Sena admin password.</p><label>New Password</label><input id="npw" type="password" placeholder="New password"><label>Confirm Password</label><input id="cpw" type="password" placeholder="Confirm password"><button class="p" style="width:100%;margin-top:12px" onclick="updatePassword()">Update Password</button></div>'}async function updatePassword(){let p=document.getElementById('npw').value,c=document.getElementById('cpw').value;if(!p||p.length<6)return toast('Password minimum 6 characters');if(p!==c)return toast('Passwords do not match');let r=await sb.auth.updateUser({password:p});if(r.error)return toast('Password update failed: '+r.error.message);toast('Password successfully updated. Have login karo.');await sb.auth.signOut();loginView()}function chooseView(){app.innerHTML='<div class="wrap"><div class="card"><h1>Bodka Yuva Sena</h1><p>Select Festival</p><div class="grid"><button class="p" onclick="openFest(\'ganesh\')">🪔 Ganesh Utsav</button><button class="p" onclick="openFest(\'navratri\')">🔱 Navratri</button></div><button onclick="logout()" style="margin-top:15px">Sign out</button></div></div>'}async function openFest(f){festival=f;await load();render();realtime()}async function load(){let [a,b]=await Promise.all([sb.from('income').select('*').eq('event_id',eid()).eq('festival_year',year).order('created_at',{ascending:false}),sb.from('expenses').select('*').eq('event_id',eid()).eq('festival_year',year).order('created_at',{ascending:false})]);if(a.error||b.error)return toast((a.error||b.error).message);data.income=(a.data||[]).map(x=>({id:x.id,name:x.full_name,mobile:x.mobile||'',amount:+x.amount,mode:x.payment_method||'',date:x.paid_date||String(x.created_at).slice(0,10),receipt:x.receipt_number||'',status:x.status||(x.paid?'Paid':'Unpaid'),notes:x.note||''}));data.expenses=(b.data||[]).map(x=>({id:x.id,cat:x.category||'',desc:x.description||'',amount:+x.amount,paid:x.paid_by||'',date:x.expense_date||'',notes:x.note||''}))}function realtime(){if(channel)sb.removeChannel(channel);channel=sb.channel('bodka-live').on('postgres_changes',{event:'*',schema:'public',table:'income',filter:'event_id=eq.'+eid()},async()=>{await load();render()}).on('postgres_changes',{event:'*',schema:'public',table:'expenses',filter:'event_id=eq.'+eid()},async()=>{await load();render()}).subscribe()}function render(){app.innerHTML='<div class="wrap"><div class="top"><div><h1>Bodka Yuva Sena</h1><b>'+(festival==='ganesh'?'Ganesh Utsav':'Navratri')+' '+year+'</b></div><button onclick="chooseView()">Switch Festival</button></div><div class="nav card"><button onclick="dashboard()">Dashboard</button><button onclick="incomePage()">Fado / Income</button><button onclick="expensePage()">Expenses</button><button onclick="logout()">Logout</button></div><div id="page"></div></div>';dashboard()}function dashboard(){let inc=data.income.reduce((a,x)=>a+x.amount,0),exp=data.expenses.reduce((a,x)=>a+x.amount,0),pending=data.income.filter(x=>x.status!=='Paid').reduce((a,x)=>a+x.amount,0);page.innerHTML='<div class="grid"><div class="card"><small>Total Fado</small><h2>'+money(inc)+'</h2></div><div class="card"><small>Expenses</small><h2>'+money(exp)+'</h2></div><div class="card"><small>Balance</small><h2>'+money(inc-exp)+'</h2></div><div class="card"><small>Pending Fado</small><h2>'+money(pending)+'</h2></div></div><div class="card"><h2>Recent Fado</h2>'+incomeTable(true)+'</div>'}function incomePage(){page.innerHTML='<div class="card"><div class="top"><h2>Fado / Income</h2><button class="p" onclick="incomeModal()">＋ Add Fado</button></div>'+incomeTable()+'</div>'}function incomeTable(short){let a=data.income;if(short)a=a.slice(0,8);return '<div style="overflow:auto"><table class="table"><tr><th>Name</th><th>Mobile</th><th>Amount</th><th>Status</th><th>Receipt</th><th>WhatsApp</th><th>Action</th></tr>'+a.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.mobile)+'</td><td>'+money(x.amount)+'</td><td><span class="pill">'+esc(x.status)+'</span></td><td>'+esc(x.receipt)+'</td><td><button class="s" onclick="wa(\''+x.id+'\')">WhatsApp</button></td><td><button onclick="incomeModal(\''+x.id+'\')">Edit</button> <button class="d" onclick="delRec(\'income\',\''+x.id+'\')">Delete</button></td></tr>').join('')+'</table></div>'}function incomeModal(id){let x=id?data.income.find(r=>r.id===id):null;app.insertAdjacentHTML('beforeend','<div class="modal"><div class="box"><h2>'+(x?'Edit':'Add')+' Fado</h2><div class="form"><div><label>Name</label><input id="n" value="'+esc(x?.name||'')+'"></div><div><label>Mobile</label><input id="m" value="'+esc(x?.mobile||'')+'"></div><div><label>Amount</label><input id="a" type="number" value="'+(x?.amount||'')+'"></div><div><label>Payment Mode</label><select id="pm"><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Cheque</option></select></div><div><label>Date</label><input id="dt" type="date" value="'+(x?.date||new Date().toISOString().slice(0,10))+'"></div><div><label>Status</label><select id="st"><option '+(x?.status==='Paid'?'selected':'')+'>Paid</option><option '+(x?.status==='Unpaid'?'selected':'')+'>Unpaid</option></select></div><div class="full"><label>Notes</label><textarea id="nt">'+esc(x?.notes||'')+'</textarea></div></div><p><b>Receipt:</b> '+(x?.receipt||'Auto generated')+'</p><button onclick="this.closest(\'.modal\').remove()">Cancel</button> <button class="p" onclick="saveIncome(\''+(id||'')+'\')">Save</button></div></div>');if(x)pm.value=x.mode||'Cash'}function receipt(name){let pre=(festival==='ganesh'?'GCM':'NRM')+year,parts=name.trim().split(/\s+/),init=((parts[0]?.[0]||'X')+(parts.at(-1)?.[0]||parts[0]?.[0]||'X')).toUpperCase(),max=data.income.reduce((n,x)=>{let m=(x.receipt||'').match(new RegExp('^'+pre+init+'(\\d+)$'));return Math.max(n,m?+m[1]:0)},0);return pre+init+String(max+1).padStart(2,'0')}async function saveIncome(id){let old=id?data.income.find(x=>x.id===id):null,name=n.value.trim(),amount=+a.value;if(!name||!amount)return toast('Name and amount required');let receiptNo=old?old.receipt:receipt(name),payload={event_id:eid(),full_name:name,mobile:m.value,amount,paid:st.value==='Paid',status:st.value,payment_method:pm.value,paid_date:st.value==='Paid'?dt.value:null,note:nt.value,created_by:user.id,receipt_number:receiptNo,festival_year:year};let r=old?await sb.from('income').update(payload).eq('id',id):await sb.from('income').insert(payload);if(r.error)return toast(r.error.message);await load();render()}function wa(id){let x=data.income.find(r=>r.id===id),p=(x.mobile||'').replace(/\D/g,'');if(p.length===10)p='91'+p;if(p.length<12)return toast('Enter valid 10 digit mobile');let title=(festival==='navratri'?'Navratri Mahotsav ':'Ganesh Mahotsav ')+year,close=festival==='navratri'?'જય માતાજી 🚩':'જય શ્રી ગણેશ 🚩',msg='🙏 *Bodka Yuva Sena*\n\n*'+title+'*\n\nનમસ્તે '+x.name+',\n\nતમારો *₹'+Number(x.amount).toLocaleString('en-IN')+'* નો ફાળો સફળતાપૂર્વક પ્રાપ્ત થયો છે. 🙏\n\n*રસીદ નંબર:* '+x.receipt+'\n*ચુકવણીનો પ્રકાર:* '+x.mode+'\n*તારીખ:* '+x.date+'\n\nઆપના અમૂલ્ય સહયોગ બદલ ખૂબ ખૂબ આભાર. 🙏\n\n*'+close+'*';window.open('https://wa.me/'+p+'?text='+encodeURIComponent(msg),'_blank')}function expensePage(){page.innerHTML='<div class="card"><div class="top"><h2>Expenses</h2><button class="p" onclick="expenseModal()">＋ Add Expense</button></div><div style="overflow:auto"><table class="table"><tr><th>Category</th><th>Description</th><th>Paid To</th><th>Amount</th><th>Date</th><th>Action</th></tr>'+data.expenses.map(x=>'<tr><td>'+esc(x.cat)+'</td><td>'+esc(x.desc)+'</td><td>'+esc(x.paid)+'</td><td>'+money(x.amount)+'</td><td>'+x.date+'</td><td><button onclick="expenseModal(\''+x.id+'\')">Edit</button> <button class="d" onclick="delRec(\'expenses\',\''+x.id+'\')">Delete</button></td></tr>').join('')+'</table></div></div>'}function expenseModal(id){let x=id?data.expenses.find(r=>r.id===id):null;app.insertAdjacentHTML('beforeend','<div class="modal"><div class="box"><h2>'+(x?'Edit':'Add')+' Expense</h2><div class="form"><div><label>Category</label><input id="ec" value="'+esc(x?.cat||'')+'"></div><div><label>Description</label><input id="ed" value="'+esc(x?.desc||'')+'"></div><div><label>Amount</label><input id="ea" type="number" value="'+(x?.amount||'')+'"></div><div><label>Paid To</label><input id="ep" value="'+esc(x?.paid||'')+'"></div><div><label>Date</label><input id="ee" type="date" value="'+(x?.date||new Date().toISOString().slice(0,10))+'"></div><div class="full"><label>Notes</label><textarea id="en">'+esc(x?.notes||'')+'</textarea></div></div><button onclick="this.closest(\'.modal\').remove()">Cancel</button> <button class="p" onclick="saveExpense(\''+(id||'')+'\')">Save</button></div></div>')}async function saveExpense(id){let old=id?data.expenses.find(x=>x.id===id):null,p={event_id:eid(),category:ec.value.trim(),description:ed.value,amount:+ea.value,paid_by:ep.value,expense_date:ee.value,note:en.value,created_by:user.id,festival_year:year};if(!p.amount)return toast('Enter amount');let r=old?await sb.from('expenses').update(p).eq('id',id):await sb.from('expenses').insert(p);if(r.error)return toast(r.error.message);await load();render()}async function delRec(t,id){if(!confirm('Delete this record?'))return;let r=await sb.from(t).delete().eq('id',id);if(r.error)return toast(r.error.message);await load();render()}async function logout(){if(channel)await sb.removeChannel(channel);await sb.auth.signOut();user=null;festival=null;loginView()}sb.auth.onAuthStateChange((event,session)=>{if(event==='PASSWORD_RECOVERY'){recoveryView()}});(async()=>{let r=await sb.auth.getSession();if(r.data.session){user=r.data.session.user;chooseView()}else loginView()})();</script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Festival Management System</title>
+<style>
+:root{--p:#6d3fd1;--bg:#f6f4fb;--ink:#211b2d;--muted:#746d80;--card:#fff;--line:#e8e3ef;--green:#17845b;--red:#c33b4a;--shadow:0 10px 30px rgba(49,30,78,.08)}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}.hidden{display:none!important}
+.login{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at top right,#eadfff 0,#f6f4fb 45%,#f6f4fb 100%)}
+.login-card{width:min(440px,100%);background:white;border:1px solid var(--line);border-radius:24px;padding:32px;box-shadow:var(--shadow)}
+.logo{width:48px;height:48px;border-radius:14px;background:var(--p);color:white;display:grid;place-items:center;font-size:24px;font-weight:800}
+h1,h2,h3{margin:0 0 8px}.muted{color:var(--muted)}label{font-size:13px;font-weight:700;display:block;margin:14px 0 7px}
+input,select,textarea{width:100%;border:1px solid #ddd6e8;border-radius:11px;padding:11px 12px;background:#fff;outline:none}
+input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3px #6d3fd120}
+.btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700}.primary{background:var(--p);color:#fff}.secondary{background:#f1edf8;color:var(--ink)}.danger{background:#fff0f1;color:var(--red)}.success{background:#e9f7f1;color:var(--green)}
+.app{min-height:100vh;display:flex}.side{width:250px;background:#fff;border-right:1px solid var(--line);padding:20px 14px;position:fixed;inset:0 auto 0 0;z-index:5}.brand{display:flex;gap:10px;align-items:center;padding:4px 8px 24px}.brand .logo{width:40px;height:40px;font-size:19px}.nav button{width:100%;text-align:left;background:transparent;border:0;padding:11px 12px;border-radius:10px;color:#5f586b;font-weight:650;margin:2px 0}.nav button.active,.nav button:hover{background:#f0ebfa;color:var(--p)}.main{margin-left:250px;width:calc(100% - 250px)}.top{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:4}.content{padding:28px;max-width:1500px;margin:auto}.crumb{font-size:13px;color:var(--muted);margin-bottom:18px}.grid{display:grid;gap:16px}.cards{grid-template-columns:repeat(4,minmax(0,1fr))}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}.metric{font-size:28px;font-weight:800;margin-top:8px}.icon{font-size:22px}.festival-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:22px}.festival{min-height:190px;display:flex;flex-direction:column;justify-content:space-between}.festival .emoji{font-size:48px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}.toolbar .grow{flex:1;min-width:220px}.table-wrap{overflow:auto;background:white;border:1px solid var(--line);border-radius:16px}.table{width:100%;border-collapse:collapse;min-width:760px}.table th,.table td{padding:13px 15px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}.table th{background:#fbfafe;color:#625b6d;font-size:12px;text-transform:uppercase;letter-spacing:.04em}.actions{display:flex;gap:6px}.badge{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f0ebfa;color:var(--p);font-size:12px;font-weight:700}.empty{text-align:center;padding:50px;color:var(--muted)}
+.chart{height:220px;display:flex;align-items:flex-end;gap:16px;padding:15px 5px}.bar-group{flex:1;height:100%;display:flex;gap:7px;align-items:flex-end;justify-content:center}.bar{width:28px;border-radius:8px 8px 3px 3px;min-height:5px}.income{background:#6d3fd1}.expense{background:#d9cbed}.legend{font-size:12px;color:var(--muted);display:flex;gap:16px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}.modal{position:fixed;inset:0;background:#17121e99;display:grid;place-items:center;padding:20px;z-index:20}.modal-box{background:#fff;width:min(600px,100%);max-height:90vh;overflow:auto;border-radius:20px;padding:24px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}.full{grid-column:1/-1}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}.toast{position:fixed;right:20px;bottom:20px;background:#211b2d;color:#fff;padding:12px 16px;border-radius:12px;z-index:50;box-shadow:var(--shadow)}
+.mobile-menu{display:none}.top-user{display:flex;align-items:center;gap:10px}.avatar{width:36px;height:36px;border-radius:50%;background:#eee7fa;color:var(--p);display:grid;place-items:center;font-weight:800;flex-shrink:0}
+.dash-split{grid-template-columns:1.5fr 1fr}
+.side-overlay{display:none;position:fixed;inset:0;background:rgba(23,18,30,.5);z-index:4}.side-overlay.show{display:block}
+h1{font-size:clamp(20px,5vw,28px)}
+.table-wrap{-webkit-overflow-scrolling:touch}
+@media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}.side{width:220px}.main{margin-left:220px;width:calc(100% - 220px)}.dash-split{grid-template-columns:1fr}}
+@media(max-width:720px){.side{transform:translateX(-100%);transition:.2s;width:250px;box-shadow:0 0 40px rgba(0,0,0,.15)}.side.open{transform:translateX(0)}.main{margin-left:0;width:100%}.mobile-menu{display:block}.top{min-height:64px;height:auto;padding:10px 16px;flex-wrap:wrap;row-gap:8px}.content{padding:16px 14px}.cards,.festival-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.top h2{font-size:17px}.table th,.table td{padding:10px 11px;font-size:13px}.card{padding:16px}.metric{font-size:24px}.festival .emoji{font-size:38px}.toolbar .grow{min-width:100%}}
+@media(max-width:480px){.top-user .badge{display:none}.top-user{gap:6px}.top .btn{padding:8px 10px;font-size:13px}.login{padding:16px}.login-card{padding:22px}.modal-box{padding:16px;border-radius:16px}.toast{left:16px;right:16px;bottom:16px;text-align:center}.festival-grid{gap:14px}.festival{min-height:150px}.festival .emoji{font-size:32px}}
+.org-logo{width:48px;height:48px;border-radius:14px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:4px}.brand .org-logo{width:40px;height:40px;border-radius:12px}.logo-preview{width:84px;height:84px;border-radius:16px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:8px}.logo-placeholder{width:84px;height:84px;border-radius:16px;background:#f0ebfa;border:1px dashed #c8bce0;display:grid;place-items:center;color:#756b82;font-size:11px;text-align:center;padding:8px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+const KEY='fms_standalone_v4_bodka_fresh';
+const seed={
+  user:null, org:'bodka', festival:null, year:2026,
+  orgs:{bodka:{name:'Bodka Yuva Sena',plan:'Pro',status:'Active',logo:''}},
+  data:{bodka:{ganesh:{2026:{income:[],expenses:[]}},navratri:{2026:{income:[],expenses:[]}}}},
+  logs:[]
+};
+
+let state;
+try {
+  state = JSON.parse(localStorage.getItem(KEY));
+  if (!state || !state.orgs || !state.data) {
+    state = seed;
+    localStorage.setItem(KEY, JSON.stringify(seed));
+  }
+} catch(e) {
+  state = seed;
+  localStorage.setItem(KEY, JSON.stringify(seed));
+}
+
+const $=id=>document.getElementById(id);
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+function orgLogo(){let l=state.orgs[state.org]?.logo;return l ? '<img src="'+l+'" class="org-logo" alt="Organization Logo">' : '<div class="logo">🪔</div>'}
+function money(n){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n)}
+function cur(){
+  if(!state.data[state.org]) state.data[state.org]={ganesh:{2026:{income:[],expenses:[]}},navratri:{2026:{income:[],expenses:[]}}};
+  if(!state.data[state.org][state.festival]) state.data[state.org][state.festival]={};
+  if(!state.data[state.org][state.festival][state.year]) state.data[state.org][state.festival][state.year]={income:[],expenses:[]};
+  return state.data[state.org][state.festival][state.year];
+}
+function log(action){state.logs.unshift({user:state.user?.name||'Admin',action,date:new Date().toLocaleString('en-IN')});state.logs=state.logs.slice(0,100);save()}
+function toast(msg){let t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+
+// Backup Export & Import Functions
+function exportBackup(){
+  let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
+  let dlAnchor = document.createElement('a');
+  dlAnchor.setAttribute("href", dataStr);
+  dlAnchor.setAttribute("download", "fms_backup_" + new Date().toISOString().slice(0,10) + ".json");
+  document.body.appendChild(dlAnchor);
+  dlAnchor.click();
+  dlAnchor.remove();
+  toast('Backup file downloaded successfully!');
+}
+
+function importBackup(event){
+  let file = event.target.files[0];
+  if(!file) return;
+  let reader = new FileReader();
+  reader.onload = function(e){
+    try {
+      let imported = JSON.parse(e.target.result);
+      if(imported && imported.orgs && imported.data){
+        state = imported;
+        save();
+        render();
+        toast('Backup imported successfully!');
+      } else {
+        toast('Invalid backup file structure!');
+      }
+    } catch(err){
+      toast('Error reading backup file!');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function render(){
+  try {
+    state.user?renderApp():renderLogin();
+  } catch(err) {
+    console.error(err);
+    document.body.innerHTML='<div style="padding:40px;font-family:sans-serif"><h2>Something went wrong.</h2><p>Clearing cache...</p><button onclick="localStorage.removeItem(\''+KEY+'\');location.reload()">Reset App</button></div>';
+  }
+}
+function renderLogin(){
+ $('root').innerHTML='<div class="login"><div class="login-card">'
+ +orgLogo()+'<div style="height:18px"></div><h1>Festival Management System</h1><p class="muted">Secure accounting & management for Bodka Yuva Sena</p>'
+ +'<label>Account</label><input value="Bodka Yuva Sena — Admin" readonly>'
+ +'<label>Password</label><input id="pass" type="password" placeholder="Enter password">'
+ +'<button class="btn primary" style="width:100%;margin-top:18px" onclick="login()">Sign in</button>'
+ +'<p class="muted" style="font-size:12px;margin-top:16px">Admin login</p>'
+ +'</div></div>';
+}
+function login(){let p=$('pass').value;if(p!=='BDKSENA@123')return toast('Incorrect password');state.org='bodka';state.user={role:'admin',name:'Mandal Admin'};save();render()}
+
+function renderApp(){
+ if(state.user.role==='super')return renderSuper();
+ if(!state.festival)return renderFestival();
+ $('root').innerHTML='<div class="app"><aside class="side" id="side">'+sidebar()+'</aside><div class="side-overlay" id="sideOverlay" onclick="closeSide()"></div><main class="main"><header class="top"><div style="display:flex;align-items:center;gap:10px"><button class="btn secondary mobile-menu" onclick="toggleSide()">☰</button><div><h2>'+state.orgs[state.org].name+'</h2><div class="muted" style="font-size:12px">'+cap(state.festival)+' · '+state.year+'</div></div></div><div class="top-user"><span class="badge">'+(state.user.role==='viewer'?'Viewer':'Admin')+'</span><div class="avatar">'+state.user.name[0]+'</div><button class="btn secondary" onclick="logout()">Logout</button></div></header><section class="content" id="page"></section></main></div>';
+ dashboard();
+}
+function cap(s){return s==='ganesh'?'Ganesh Chaturthi':'Navratri'}
+function logout(){state.user=null;save();render()}
+function toggleSide(){let s=$('side'),o=$('sideOverlay');if(!s)return;let opening=!s.classList.contains('open');s.classList.toggle('open');o?.classList.toggle('show');document.body.style.overflow=opening?'hidden':''}
+function closeSide(){$('side')?.classList.remove('open');$('sideOverlay')?.classList.remove('show');document.body.style.overflow=''}
+function sidebar(){let items=[['dashboard','Dashboard'],['years','Years'],['income','Income / Fado'],['expenses','Expenses'],['contributors','Contributors'],['reports','Reports'],['activity','Activity Log']];if(state.user.role==='admin')items.push(['settings','Settings']);return '<div class="brand">'+orgLogo()+'<div><b>Festival Management</b><div class="muted" style="font-size:11px">Mandal SaaS</div></div></div><div class="nav">'+items.map(x=>'<button onclick="nav(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div><div style="position:absolute;bottom:18px;left:14px;right:14px"><button class="btn secondary" style="width:100%" onclick="state.festival=null;render()">← Change Festival</button></div>'}
+function dashboard(){let c=cur(),inc=c.income.reduce((a,x)=>a+x.amount,0),exp=c.expenses.reduce((a,x)=>a+x.amount,0);$('page').innerHTML='<div class="crumb">Home / '+cap(state.festival)+' / '+state.year+'</div><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h1>Dashboard</h1><p class="muted">Festival accounting overview (With Carry Forward)</p></div></div><div class="grid cards" style="margin-top:20px"><div class="card"><div class="icon">💰</div><div class="muted">Total Income / Fado</div><div class="metric">'+money(inc)+'</div></div><div class="card"><div class="icon">🧾</div><div class="muted">Total Expenses</div><div class="metric">'+money(exp)+'</div></div><div class="card"><div class="icon">📊</div><div class="muted">Current Balance</div><div class="metric">'+money(inc-exp)+'</div></div><div class="card"><div class="icon">👥</div><div class="muted">Contributors</div><div class="metric">'+new Set(c.income.map(x=>x.name)).size+'</div></div></div><div class="grid dash-split" style="margin-top:18px"><div class="card"><h3>Recent Transactions</h3>'+transactions(c)+'</div><div class="card"><h3>Income vs Expense</h3><div class="chart"><div class="bar-group"><div class="bar income" style="height:'+Math.min(100,inc/(Math.max(inc,exp)||1)*100)+'%"></div><div class="bar expense" style="height:'+Math.min(100,exp/(Math.max(inc,exp)||1)*100)+'%"></div></div></div><div class="legend"><span><i class="dot income"></i>Income</span><span><i class="dot expense"></i>Expense</span></div></div></div>';}
+function transactions(c){let rows=[...c.income.map(x=>({...x,type:'Income'})),...c.expenses.map(x=>({...x,type:'Expense',name:x.desc,mode:x.mode}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);return '<div class="table-wrap" style="margin-top:12px"><table class="table"><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Mode</th>'+(state.user.role==='admin'?'<th>Action</th>':'')+'</tr></thead><tbody>'+rows.map(x=>'<tr><td>'+x.date+'</td><td>'+x.name+'</td><td><span class="badge">'+x.type+'</span></td><td>'+money(x.amount)+'</td><td>'+x.mode+'</td>'+(state.user.role==='admin'?'<td><button class="btn secondary" onclick="edit(\''+x.type+'\','+x.id+')">Edit</button></td>':'')+'</tr>').join('')+'</tbody></table></div>';}
+function nav(n){document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let map={dashboard,years,income:incomePage,expenses:expensePage,contributors,reports,activity,settings};map[n]?.();closeSide()}
+function years(){
+ let yearObj=state.data[state.org][state.festival]||{};
+ let yearList=Object.keys(yearObj).map(Number).filter(y=>Number.isInteger(y)&&y>=2000&&y<=2100).sort((a,b)=>b-a);
+ if(!yearList.length){yearList=[2026];yearObj[2026]={income:[],expenses:[]};save();}
+ $('page').innerHTML='<div class="crumb">Festival / Years</div><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h1>Years & Carry Forward</h1><p class="muted">Manage independent year-wise accounting with automatic balance carry forward</p></div>'+(state.user.role==='admin'?'<button class="btn primary" id="addYearBtn">＋ Add Year (With Carry Forward)</button>':'')+'</div><div class="grid cards" style="margin-top:20px">'+yearList.map((y,i)=>{let d=yearObj[y]||{income:[],expenses:[]};let iTotal=d.income.reduce((a,x)=>a+Number(x.amount||0),0);let eTotal=d.expenses.reduce((a,x)=>a+Number(x.amount||0),0);let bal=iTotal-eTotal;return '<div class="card"><span class="badge">'+(state.year===y?'Current Active Year':'Year')+'</span><h2 style="margin-top:16px">'+y+'</h2><p class="muted">Income: '+money(iTotal)+'<br>Expenses: '+money(eTotal)+'<br><b>Net Balance: '+money(bal)+'</b></p><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn '+(state.year===y?'primary':'secondary')+'" data-open-year="'+y+'">'+(state.year===y?'Opened':'Open '+y)+'</button>'+(state.user.role==='admin'?'<button type="button" class="btn danger year-delete-btn" data-year-delete="'+y+'">Delete</button>':'')+'</div></div>'}).join('')+'</div>';
+ $('addYearBtn')?.addEventListener('click',openYearModal);
+ document.querySelectorAll('[data-open-year]').forEach(btn=>btn.addEventListener('click',()=>openYear(Number(btn.dataset.openYear))));
+ document.querySelectorAll('[data-year-delete]').forEach(btn=>btn.addEventListener('click',()=>window.deleteYear(Number(btn.dataset.yearDelete))));
+}
+function openYear(y){let yNum=Number(y);let obj=state.data[state.org][state.festival];if(!obj[yNum])obj[yNum]={income:[],expenses:[]};state.year=yNum;save();renderApp();toast('Year '+yNum+' opened');}
+window.deleteYear=function(y){
+ let yNum=Number(y);
+ let festivalData=state.data?.[state.org]?.[state.festival];
+ if(!festivalData || !Object.prototype.hasOwnProperty.call(festivalData,yNum)){toast('Year not found');return;}
+ let d=festivalData[yNum]||{income:[],expenses:[]};
+ let incomeCount=(d.income||[]).length, expenseCount=(d.expenses||[]).length;
+ if(!window.confirm('Delete '+yNum+'?\n\nThis will permanently delete this year and its '+incomeCount+' income/fado and '+expenseCount+' expense record(s).')) return;
+ delete festivalData[yNum];
+ let remaining=Object.keys(festivalData).map(Number).filter(v=>Number.isInteger(v)&&v>=2000&&v<=2100).sort((a,b)=>b-a);
+ if(remaining.length===0){festivalData[2026]={income:[],expenses:[]};remaining=[2026];}
+ if(Number(state.year)===yNum) state.year=remaining[0];
+ save();
+ renderApp();
+ toast('Year '+yNum+' deleted successfully');
+};
+function openYearModal(){
+ $('modal')?.remove();
+ let existing=Object.keys(state.data[state.org][state.festival]).map(Number);
+ let maxYear=existing.length?Math.max(...existing):2026;
+ let recYear=maxYear+1;
+ 
+ let m=document.createElement('div');m.id='modal';m.className='modal';m.innerHTML='<div class="modal-box"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Add New Year with Carry Forward</h2><button class="btn secondary" onclick="$(\'modal\').remove()">✕</button></div><p class="muted">Add a new year. The remaining balance (Closing Balance) from the previous year will automatically be added as an <b>Opening Balance</b> to the new year!</p><label>New Year</label><input id="newyear" type="number" min="2000" max="2100" value="'+recYear+'"><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px"><button class="btn secondary" onclick="$(\'modal\').remove()">Cancel</button><button class="btn primary" onclick="addYearWithCarryForward()">Create Year & Carry Forward Balance</button></div></div>';document.body.appendChild(m);setTimeout(()=>$('newyear')?.focus(),50);
+}
+function addYearWithCarryForward(){
+ let raw=$('newyear')?.value?.trim();let y=Number(raw);
+ if(!raw||!Number.isInteger(y)||y<2000||y>2100)return toast('Please enter a valid year between 2000 and 2100');
+ let obj=state.data[state.org][state.festival];
+ if(obj[y])return toast('This year already exists');
+
+ let prevYear=y-1;
+ let prevData=obj[prevYear];
+ let carryAmount=0;
+ if(prevData){
+   let pInc=(prevData.income||[]).reduce((a,x)=>a+Number(x.amount||0),0);
+   let pExp=(prevData.expenses||[]).reduce((a,x)=>a+Number(x.amount||0),0);
+   carryAmount=pInc-pExp;
+ }
+
+ obj[y]={income:[],expenses:[]};
+ 
+ if(carryAmount>0){
+   obj[y].income.push({
+     id: Date.now(),
+     name: 'Opening Balance (Carry Forward from '+prevYear+')',
+     mobile: '-',
+     amount: carryAmount,
+     mode: 'Bank Transfer',
+     date: y+'-01-01',
+     receipt: 'CF-'+y,
+     notes: 'Automatic carry forward from previous year closing balance'
+   });
+ }
+
+ state.year=y;
+ save();
+ log('Created '+y+' year with carry forward '+(carryAmount>0?money(carryAmount):'₹0'));
+ $('modal')?.remove();
+ renderApp();
+ toast('Year '+y+' added! Carry forward: '+money(carryAmount));
+}
+function incomePage(){let c=cur();$('page').innerHTML='<div class="crumb">Festival / Income</div><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h1>Income / Fado</h1><p class="muted">Total: <b>'+money(c.income.reduce((a,x)=>a+x.amount,0))+'</b> (Includes Carry Forward if any)</p></div>'+(state.user.role==='admin'?'<button class="btn primary" onclick="openModal(\'income\')">＋ Add Income</button>':'')+'</div><div class="toolbar"><input class="grow" id="isearch" placeholder="Search contributor..." oninput="incomeTable()"><select id="imode" onchange="incomeTable()"><option value="">All payment modes</option><option>Cash</option><option>UPI</option><option>Bank Transfer</option><option>Cheque</option></select></div><div id="itable"></div>';incomeTable()}
+function incomeTable(){let q=($('isearch')?.value||'').toLowerCase(),m=$('imode')?.value||'',arr=cur().income.filter(x=>(x.name+' '+x.mobile).toLowerCase().includes(q)&&(!m||x.mode===m));$('itable').innerHTML='<div class="table-wrap"><table class="table"><thead><tr><th>Contributor / Source</th><th>Mobile</th><th>Amount</th><th>Mode</th><th>Date</th><th>Receipt</th>'+(state.user.role==='admin'?'<th>Action</th>':'')+'</tr></thead><tbody>'+arr.map(x=>'<tr><td><b>'+x.name+'</b></td><td>'+x.mobile+'</td><td><b>'+money(x.amount)+'</b></td><td>'+x.mode+'</td><td>'+x.date+'</td><td>'+(x.receipt||'-')+'</td>'+(state.user.role==='admin'?'<td class="actions"><button class="btn secondary" onclick="edit(\'Income\','+x.id+')">Edit</button><button class="btn success" onclick="sendWhatsAppReceipt('+x.id+')">WhatsApp</button><button class="btn danger" onclick="del(\'income\','+x.id+')">Delete</button></td>':'<td><button class="btn success" onclick="sendWhatsAppReceipt('+x.id+')">WhatsApp</button></td>')+'</tr>').join('')+'</tbody></table></div>'}
+function expensePage(){let c=cur();$('page').innerHTML='<div class="crumb">Festival / Expenses</div><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h1>Expenses</h1><p class="muted">Total: <b>'+money(c.expenses.reduce((a,x)=>a+x.amount,0))+'</b></p></div>'+(state.user.role==='admin'?'<button class="btn primary" onclick="openModal(\'expense\')">＋ Add Expense</button>':'')+'</div><div class="toolbar"><input class="grow" id="esearch" placeholder="Search description or paid to..." oninput="expenseTable()"><select id="ecat" onchange="expenseTable()"><option value="">All categories</option>'+['Decoration','Sound','Lighting','Prasad','Ground','Garba','Printing','Security','Other'].map(x=>'<option>'+x+'</option>').join('')+'</select></div><div id="etable"></div>';expenseTable()}
+function expenseTable(){let q=($('esearch')?.value||'').toLowerCase(),m=$('ecat')?.value||'',arr=cur().expenses.filter(x=>(x.desc+' '+x.paid).toLowerCase().includes(q)&&(!m||x.cat===m));$('etable').innerHTML='<div class="table-wrap"><table class="table"><thead><tr><th>Category</th><th>Description</th><th>Paid To</th><th>Amount</th><th>Mode</th><th>Date</th>'+(state.user.role==='admin'?'<th>Action</th>':'')+'</tr></thead><tbody>'+arr.map(x=>'<tr><td><span class="badge">'+x.cat+'</span></td><td>'+x.desc+'</td><td>'+x.paid+'</td><td><b>'+money(x.amount)+'</b></td><td>'+x.mode+'</td><td>'+x.date+'</td>'+(state.user.role==='admin'?'<td class="actions"><button class="btn secondary" onclick="edit(\'Expense\','+x.id+')">Edit</button><button class="btn danger" onclick="del(\'expenses\','+x.id+')">Delete</button></td>':'')+'</tr>').join('')+'</tbody></table></div>'}
+function contributors(){let map={};cur().income.forEach(x=>{map[x.name]??={name:x.name,mobile:x.mobile,total:0,count:0,last:''};map[x.name].total+=x.amount;map[x.name].count++;map[x.name].last=map[x.name].last>x.date?map[x.name].last:x.date});let a=Object.values(map);$('page').innerHTML='<div class="crumb">Festival / Contributors</div><h1>Contributors</h1><p class="muted">Contribution history is isolated to the selected festival and year.</p><div class="table-wrap" style="margin-top:18px"><table class="table"><thead><tr><th>Name</th><th>Mobile</th><th>Total Contribution</th><th>Contributions</th><th>Last Contribution</th></tr></thead><tbody>'+a.map(x=>'<tr><td><b>'+x.name+'</b></td><td>'+x.mobile+'</td><td>'+money(x.total)+'</td><td>'+x.count+'</td><td>'+x.last+'</td></tr>').join('')+'</tbody></table></div>'}
+function reports(){let c=cur(),inc=c.income.reduce((a,x)=>a+x.amount,0),exp=c.expenses.reduce((a,x)=>a+x.amount,0);$('page').innerHTML='<div class="crumb">Festival / Reports</div><div style="display:flex;justify-content:space-between;align-items:center"><div><h1>Reports</h1><p class="muted">'+cap(state.festival)+' · '+state.year+'</p></div><button class="btn secondary" onclick="window.print()">Export / Print Report</button></div><div class="grid cards" style="margin-top:18px"><div class="card"><div class="muted">Income</div><div class="metric">'+money(inc)+'</div></div><div class="card"><div class="muted">Expenses</div><div class="metric">'+money(exp)+'</div></div><div class="card"><div class="muted">Balance</div><div class="metric">'+money(inc-exp)+'</div></div><div class="card"><div class="muted">Transactions</div><div class="metric">'+(c.income.length+c.expenses.length)+'</div></div></div><div class="card" style="margin-top:18px"><h3>Year Comparison (With Carry Forward)</h3><div class="table-wrap" style="margin-top:12px"><table class="table"><thead><tr><th>Year</th><th>Income</th><th>Expense</th><th>Closing Balance</th></tr></thead><tbody>'+Object.keys(state.data[state.org][state.festival]||{}).map(Number).filter(y=>Number.isInteger(y)).sort((a,b)=>b-a).map(y=>{let d=state.data[state.org][state.festival][y]||{income:[],expenses:[]};let i=d.income.reduce((a,x)=>a+x.amount,0),e=d.expenses.reduce((a,x)=>a+x.amount,0);return '<tr><td>'+y+'</td><td>'+money(i)+'</td><td>'+money(e)+'</td><td><b>'+money(i-e)+'</b></td></tr>'}).join('')+'</tbody></table></div></div>';}
+function activity(){$('page').innerHTML='<div class="crumb">Festival / Activity Log</div><h1>Activity Log</h1><p class="muted">Changes made in the demo are recorded here.</p><div class="table-wrap" style="margin-top:18px"><table class="table"><thead><tr><th>User</th><th>Action</th><th>Date / Time</th></tr></thead><tbody>'+state.logs.map(x=>'<tr><td>'+x.user+'</td><td>'+x.action+'</td><td>'+x.date+'</td></tr>').join('')+'</tbody></table></div>'}
+
+function settings(){
+  let o=state.orgs[state.org];
+  $('page').innerHTML='<div class="crumb">Organization / Settings</div><h1>Organization Settings & Data Backup</h1>'
+  +'<div class="card" style="max-width:700px;margin-top:18px"><div class="form-grid">'
+  +'<div class="full"><label>Organization Name</label><input value="'+o.name+'" onchange="state.orgs[state.org].name=this.value;save();renderApp()"></div>'
+  +'<div><label>Contact Number</label><input id="orgContact" value="'+(o.contact||'')+'" placeholder="+91" onchange="state.orgs[state.org].contact=this.value;save()"></div>'
+  +'<div><label>Email</label><input id="orgEmail" value="'+(o.email||'')+'" placeholder="mandal@example.com" onchange="state.orgs[state.org].email=this.value;save()"></div>'
+  +'<div class="full"><label>Address</label><textarea id="orgAddress" rows="3" onchange="state.orgs[state.org].address=this.value;save()">'+(o.address||'')+'</textarea></div>'
+  +'<div class="full"><label>Organization Logo</label><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:8px 0 12px">'+(o.logo?'<img src="'+o.logo+'" class="logo-preview" alt="Logo preview">':'<div class="logo-placeholder">No logo uploaded</div>')+'<div><input id="orgLogoFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="uploadOrgLogo(this)"><p class="muted" style="font-size:12px">PNG, JPG, WEBP or SVG. The selected logo is saved for this organization.</p></div></div>'+(o.logo?'<button class="btn danger" onclick="removeOrgLogo()">Remove Logo</button>':'')+'</div>'
+  +'</div></div>'
+  +'<div class="card" style="max-width:700px;margin-top:18px"><h3>Offline Data Backup & Sharing</h3><p class="muted">Export your data to share with other devices or import an existing backup file (.json).</p>'
+  +'<div style="display:flex;gap:12px;margin-top:16px;flex-wrap:wrap">'
+  +'<button class="btn primary" onclick="exportBackup()">📥 Export Backup (Download .json)</button>'
+  +'<label class="btn secondary" style="margin:0;cursor:pointer;display:inline-flex;align-items:center">📤 Import Backup <input type="file" accept=".json" style="display:none" onchange="importBackup(event)"></label>'
+  +'</div></div>';
+}
+
+function uploadOrgLogo(input){let file=input.files&&input.files[0];if(!file)return;if(file.size>2*1024*1024)return toast('Logo must be 2MB or smaller');if(!file.type.startsWith('image/'))return toast('Please select an image file');let r=new FileReader();r.onload=function(e){state.orgs[state.org].logo=e.target.result;save();log('Updated organization logo');renderApp();toast('Organization logo saved successfully')};r.readAsDataURL(file)}
+function removeOrgLogo(){if(!state.orgs[state.org].logo)return;if(!confirm('Remove this organization logo?'))return;state.orgs[state.org].logo='';save();log('Removed organization logo');renderApp();toast('Organization logo removed')}
+function openModal(type,item){
+  const editing=!!item;
+  const income=type.toLowerCase()==='income';
+  const d=editing ? (income ? cur().income.find(x=>x.id===item) : cur().expenses.find(x=>x.id===item)) : null;
+  const modes=['Cash','UPI','Bank Transfer','Cheque'];
+  const cats=['Decoration','Sound','Lighting','Prasad','Ground','Garba','Printing','Security','Other'];
+  const modeOptions=modes.map(x=>'<option '+(d&&d.mode===x?'selected':'')+'>'+x+'</option>').join('');
+  const catOptions=cats.map(x=>'<option '+(d&&d.cat===x?'selected':'')+'>'+x+'</option>').join('');
+  const form=income
+    ? '<div><label>Contributor Name / Source</label><input id="mname" value="'+(d?.name||'')+'"></div>'
+      +'<div><label>Mobile Number</label><input id="mmobile" value="'+(d?.mobile||'')+'"></div>'
+      +'<div><label>Amount</label><input id="mamount" type="number" value="'+(d?.amount||'')+'"></div>'
+      +'<div><label>Payment Mode</label><select id="mmode">'+modeOptions+'</select></div>'
+      +'<div><label>Date</label><input id="mdate" type="date" value="'+(d?.date||new Date().toISOString().slice(0,10))+'"></div>'
+      +'<div><label>Receipt Number</label><input id="mreceipt" value="'+(d?.receipt||'')+'" readonly placeholder="Auto generated"></div>'
+      +'<div class="full"><label>Notes</label><textarea id="mnotes">'+(d?.notes||'')+'</textarea></div>'
+    : '<div><label>Expense Category</label><select id="mcat">'+catOptions+'</select></div>'
+      +'<div><label>Description</label><input id="mdesc" value="'+(d?.desc||'')+'"></div>'
+      +'<div><label>Amount</label><input id="mamount" type="number" value="'+(d?.amount||'')+'"></div>'
+      +'<div><label>Paid To</label><input id="mpaid" value="'+(d?.paid||'')+'"></div>'
+      +'<div><label>Payment Mode</label><select id="mmode">'+modeOptions+'</select></div>'
+      +'<div><label>Date</label><input id="mdate" type="date" value="'+(d?.date||new Date().toISOString().slice(0,10))+'"></div>'
+      +'<div><label>Bill/Receipt Number</label><input id="mreceipt" value="'+(d?.receipt||'')+'"></div>'
+      +'<div class="full"><label>Notes</label><textarea id="mnotes">'+(d?.notes||'')+'</textarea></div>';
+  const modal='<div class="modal" id="modal"><div class="modal-box">'
+    +'<h2>'+(editing?'Edit':'Add')+' '+(income?'Income / Fado':'Expense')+'</h2>'
+    +'<p class="muted">Changes are saved locally and recorded in Activity Log.</p>'
+    +'<div class="form-grid">'+form+'</div>'
+    +'<div class="modal-actions"><button class="btn secondary" onclick="$(\'modal\').remove()">Cancel</button>'
+    +'<button class="btn primary" onclick="saveModal(\''+(income?'income':'expenses')+'\','+(item||0)+')">'+(editing?'Save Changes':'Add Record')+'</button></div>'
+    +'</div></div>';
+  $('root').insertAdjacentHTML('beforeend',modal);
+}
+function receiptPrefix(){
+  return state.festival==='ganesh' ? 'GCM' : 'NRM';
+}
+function receiptInitials(name){
+  let parts=String(name||'').trim().split(/\s+/).filter(Boolean);
+  if(!parts.length) return 'XX';
+  let first=parts[0][0]||'X';
+  let last=parts.length>1 ? parts[parts.length-1][0] : first;
+  return (first+last).toUpperCase();
+}
+function nextReceiptNumber(name){
+  let arr=cur().income||[];
+  let prefix=receiptPrefix()+String(state.year);
+  let max=0;
+  arr.forEach(x=>{
+    let m=String(x.receipt||'').match(new RegExp('^'+prefix+'[A-Z]{2}(\\d+)$','i'));
+    if(m) max=Math.max(max,Number(m[1])||0);
+  });
+  return prefix+receiptInitials(name)+String(max+1).padStart(2,'0');
+}
+function sendWhatsAppReceipt(id){
+  let x=cur().income.find(r=>r.id===id);
+  if(!x) return toast('Receipt record not found');
+  let phone=String(x.mobile||'').replace(/\D/g,'');
+  if(phone.length===10) phone='91'+phone;
+  if(phone.length<12) return toast('Please enter a valid 10-digit mobile number');
+  let mandal=state.orgs[state.org]?.name||'Mandal';
+  let isNavratri=state.festival==='navratri';
+  let festivalTitle=(isNavratri?'Navratri Mahotsav ':'Ganesh Mahotsav ')+state.year;
+  let closing=isNavratri?'જય માતાજી 🚩':'જય શ્રી ગણેશ 🚩';
+  let message='🙏 *'+mandal+'*\n\n*'+festivalTitle+'*\n\nનમસ્તે '+x.name+',\n\nતમારો *₹'+Number(x.amount).toLocaleString('en-IN')+'* નો ફાળો સફળતાપૂર્વક પ્રાપ્ત થયો છે. 🙏\n\n*રસીદ નંબર:* '+x.receipt+'\n*ચુકવણીનો પ્રકાર:* '+x.mode+'\n*તારીખ:* '+x.date+'\n\nBodka Yuva Sena તરફથી આપના અમૂલ્ય સહયોગ બદલ ખૂબ ખૂબ આભાર. 🙏\n\n*'+closing+'*';
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(message),'_blank');
+}
+function saveModal(kind,id){let arr=cur()[kind],editing=id?arr.find(x=>x.id===id):null,amount=Number($('mamount').value||0);if(!amount)return toast('Enter an amount');let obj=kind==='income'?{id:id||Date.now(),name:$('mname').value,mobile:$('mmobile').value,amount,mode:$('mmode').value,date:$('mdate').value,receipt:editing?(editing.receipt||$('mreceipt').value):nextReceiptNumber($('mname').value),notes:$('mnotes').value}:{id:id||Date.now(),cat:$('mcat').value,desc:$('mdesc').value,amount,paid:$('mpaid').value,mode:$('mmode').value,date:$('mdate').value,receipt:$('mreceipt').value,notes:$('mnotes').value};if(editing){let old=editing.amount;Object.assign(editing,obj);log(`Edited ${kind==='income'?'income':'expense'} ${money(old)} → ${money(amount)}`)}else{arr.unshift(obj);log(`Added ${kind==='income'?'income':'expense'} ${money(amount)}`)}save();$('modal').remove();kind==='income'?incomePage():expensePage();toast(editing?'Updated successfully':'Added successfully')}
+function edit(type,id){openModal(type,id)}
+function del(kind,id){if(!confirm('Delete this record? This action cannot be undone.'))return;let a=cur()[kind],i=a.findIndex(x=>x.id===id),old=a[i];if(i>=0){a.splice(i,1);log(`Deleted ${kind==='income'?'income':'expense'} ${money(old.amount)}`);save();kind==='income'?incomePage():expensePage();toast('Deleted')}}
+function renderFestival(){$('root').innerHTML='<div class="login"><div style="width:min(850px,100%)"><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'+orgLogo()+'<div><h2>'+state.orgs[state.org].name+'</h2><div class="muted">Select a festival to manage accounts</div></div></div><div class="festival-grid"><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'ganesh\')"><div class="emoji">🪔</div><div><h3>Ganesh Chaturthi</h3><p class="muted">Manage mandap, visarjan, and donation records.</p></div><button class="btn primary" style="width:100%">Open Ganesh Chaturthi</button></div><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'navratri\')"><div class="emoji">🔱</div><div><h3>Navratri</h3><p class="muted">Manage garba ground, sound, and passes.</p></div><button class="btn primary" style="width:100%">Open Navratri</button></div></div><div style="margin-top:24px;text-align:right"><button class="btn secondary" onclick="logout()">← Sign out</button></div></div></div>'}
+function selectFestival(f){state.festival=f;save();renderApp()}
+function renderSuper(){$('root').innerHTML='<div class="app"><main class="main" style="margin-left:0;width:100%"><header class="top"><h2>Super Admin Dashboard</h2><button class="btn secondary" onclick="logout()">Logout</button></header><section class="content"><h1>Mandals Overview</h1><div class="grid cards" style="margin-top:18px"><div class="card"><h3>Bodka Yuva Sena</h3><p class="muted">Plan: Pro · Status: Active</p></div><div class="card"><h3>Patel Yuvak Mandal</h3><p class="muted">Plan: Standard · Status: Active</p></div></div></section></main></div>'}
+render();
+</script>
+</body>
+</html>
