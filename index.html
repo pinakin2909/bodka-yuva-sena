@@ -67,7 +67,7 @@ function save(){
   localStorage.setItem(KEY,JSON.stringify(state));
   if(currentAuthUser && !isHydrating){
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>persistSharedState(),350);
+    saveTimer=setTimeout(()=>{saveTimer=null;persistSharedState();},350);
   }
 }
 function sharedSnapshot(){
@@ -81,6 +81,7 @@ function persistSharedStateNow(){
   persistChain=persistChain.then(async()=>{
     const {error}=await sb.from('app_state').upsert(row,{onConflict:'id'});
     if(error){console.error('Shared save failed',error);toast('Online save failed: '+error.message);throw error;}
+    console.info('Bodka shared database save successful',row.updated_at);
   }).catch(err=>{console.error(err);});
   return persistChain;
 }
@@ -121,7 +122,7 @@ async function hydrateSharedState(user){
   if(realtimeChannel)sb.removeChannel(realtimeChannel);
   realtimeChannel=sb.channel('bodka-yuva-sena-shared-state')
     .on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:'id=eq.'+APP_STATE_ID},payload=>{
-      if(!payload.new || payload.new.client_id===CLIENT_ID || !payload.new.payload || saveTimer)return;
+      if(!payload.new || payload.new.client_id===CLIENT_ID || !payload.new.payload || saveTimer!==null)return;
       isHydrating=true;
       state=payload.new.payload;
       ensureStateShape();
