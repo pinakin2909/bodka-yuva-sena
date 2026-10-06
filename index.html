@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Festival Management System</title>
+<!-- Supabase Library Added Here -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{--p:#6d3fd1;--bg:#f6f4fb;--ink:#211b2d;--muted:#746d80;--card:#fff;--line:#e8e3ef;--green:#17845b;--red:#c33b4a;--shadow:0 10px 30px rgba(49,30,78,.08)}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Arial;background:var(--bg);color:var(--ink)}
@@ -17,14 +19,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--p);box-shadow:0 0 0 3
 .btn{border:0;border-radius:10px;padding:10px 14px;font-weight:700}.primary{background:var(--p);color:#fff}.secondary{background:#f1edf8;color:var(--ink)}.danger{background:#fff0f1;color:var(--red)}.success{background:#e9f7f1;color:var(--green)}
 .app{min-height:100vh;display:flex}.side{width:250px;background:#fff;border-right:1px solid var(--line);padding:20px 14px;position:fixed;inset:0 auto 0 0;z-index:5}.brand{display:flex;gap:10px;align-items:center;padding:4px 8px 24px}.brand .logo{width:40px;height:40px;font-size:19px}.nav button{width:100%;text-align:left;background:transparent;border:0;padding:11px 12px;border-radius:10px;color:#5f586b;font-weight:650;margin:2px 0}.nav button.active,.nav button:hover{background:#f0ebfa;color:var(--p)}.main{margin-left:250px;width:calc(100% - 250px)}.top{height:72px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 28px;position:sticky;top:0;z-index:4}.content{padding:28px;max-width:1500px;margin:auto}.crumb{font-size:13px;color:var(--muted);margin-bottom:18px}.grid{display:grid;gap:16px}.cards{grid-template-columns:repeat(4,minmax(0,1fr))}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:var(--shadow)}.metric{font-size:28px;font-weight:800;margin-top:8px}.icon{font-size:22px}.festival-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin-top:22px}.festival{min-height:190px;display:flex;flex-direction:column;justify-content:space-between}.festival .emoji{font-size:48px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:16px 0}.toolbar .grow{flex:1;min-width:220px}.table-wrap{overflow:auto;background:white;border:1px solid var(--line);border-radius:16px}.table{width:100%;border-collapse:collapse;min-width:760px}.table th,.table td{padding:13px 15px;border-bottom:1px solid var(--line);text-align:left;font-size:14px}.table th{background:#fbfafe;color:#625b6d;font-size:12px;text-transform:uppercase;letter-spacing:.04em}.actions{display:flex;gap:6px}.badge{display:inline-flex;padding:5px 8px;border-radius:999px;background:#f0ebfa;color:var(--p);font-size:12px;font-weight:700}.empty{text-align:center;padding:50px;color:var(--muted)}
 .chart{height:220px;display:flex;align-items:flex-end;gap:16px;padding:15px 5px}.bar-group{flex:1;height:100%;display:flex;gap:7px;align-items:flex-end;justify-content:center}.bar{width:28px;border-radius:8px 8px 3px 3px;min-height:5px}.income{background:#6d3fd1}.expense{background:#d9cbed}.legend{font-size:12px;color:var(--muted);display:flex;gap:16px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}.modal{position:fixed;inset:0;background:#17121e99;display:grid;place-items:center;padding:20px;z-index:20}.modal-box{background:#fff;width:min(600px,100%);max-height:90vh;overflow:auto;border-radius:20px;padding:24px}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px}.full{grid-column:1/-1}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}.toast{position:fixed;right:20px;bottom:20px;background:#211b2d;color:#fff;padding:12px 16px;border-radius:12px;z-index:50;box-shadow:var(--shadow)}
-.mobile-menu{display:none}.top-user{display:flex;align-items:center;gap:10px}.avatar{width:36px;height:36px;border-radius:50%;background:#eee7fa;color:var(--p);display:grid;place-items:center;font-weight:800;flex-shrink:0}
-.dash-split{grid-template-columns:1.5fr 1fr}
-.side-overlay{display:none;position:fixed;inset:0;background:rgba(23,18,30,.5);z-index:4}.side-overlay.show{display:block}
-h1{font-size:clamp(20px,5vw,28px)}
-.table-wrap{-webkit-overflow-scrolling:touch}
-@media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}.side{width:220px}.main{margin-left:220px;width:calc(100% - 220px)}.dash-split{grid-template-columns:1fr}}
-@media(max-width:720px){.side{transform:translateX(-100%);transition:.2s;width:250px;box-shadow:0 0 40px rgba(0,0,0,.15)}.side.open{transform:translateX(0)}.main{margin-left:0;width:100%}.mobile-menu{display:block}.top{min-height:64px;height:auto;padding:10px 16px;flex-wrap:wrap;row-gap:8px}.content{padding:16px 14px}.cards,.festival-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.top h2{font-size:17px}.table th,.table td{padding:10px 11px;font-size:13px}.card{padding:16px}.metric{font-size:24px}.festival .emoji{font-size:38px}.toolbar .grow{min-width:100%}}
-@media(max-width:480px){.top-user .badge{display:none}.top-user{gap:6px}.top .btn{padding:8px 10px;font-size:13px}.login{padding:16px}.login-card{padding:22px}.modal-box{padding:16px;border-radius:16px}.toast{left:16px;right:16px;bottom:16px;text-align:center}.festival-grid{gap:14px}.festival{min-height:150px}.festival .emoji{font-size:32px}}
+.mobile-menu{display:none}.top-user{display:flex;align-items:center;gap:10px}.avatar{width:36px;height:36px;border-radius:50%;background:#eee7fa;color:var(--p);display:grid;place-items:center;font-weight:800}
+@media(max-width:1000px){.cards{grid-template-columns:repeat(2,1fr)}.side{width:220px}.main{margin-left:220px;width:calc(100% - 220px)}}
+@media(max-width:720px){.side{transform:translateX(-100%);transition:.2s;width:250px}.side.open{transform:translateX(0)}.main{margin-left:0;width:100%}.mobile-menu{display:block}.top{padding:0 16px}.content{padding:18px 14px}.cards,.festival-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.full{grid-column:auto}.top h2{font-size:17px}}
 .org-logo{width:48px;height:48px;border-radius:14px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:4px}.brand .org-logo{width:40px;height:40px;border-radius:12px}.logo-preview{width:84px;height:84px;border-radius:16px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:8px}.logo-placeholder{width:84px;height:84px;border-radius:16px;background:#f0ebfa;border:1px dashed #c8bce0;display:grid;place-items:center;color:#756b82;font-size:11px;text-align:center;padding:8px}
 </style>
 </head>
@@ -32,6 +29,11 @@ h1{font-size:clamp(20px,5vw,28px)}
 <div id="root"></div>
 
 <script>
+// --- SUPABASE CONFIGURATION ---
+const supabaseUrl = 'https://ztvkybdluwtsxopmpwxq.supabase.co'; 
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp0dmt5YmRsdXd0c3hvcG1wd3hxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNTQ2NDEsImV4cCI6MjEwNDYzMDY0MX0.bqcFvsQA1JNf6cU-Sm4I_0GN-4XT8kIrTKNqTLgATS4'; 
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
 const KEY='fms_standalone_v4_bodka_fresh';
 const seed={
   user:null, org:'bodka', festival:null, year:2026,
@@ -53,7 +55,39 @@ try {
 }
 
 const $=id=>document.getElementById(id);
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+
+// --- NAVU SAVE FUNCTION (ONLINE SAVE KARVA MATE) ---
+async function save(){
+  localStorage.setItem(KEY,JSON.stringify(state));
+  try {
+    let cloudData = { orgs: state.orgs, data: state.data, logs: state.logs };
+    await supabase.from('app_state').update({ data: cloudData }).eq('id', 1);
+  } catch(e) {
+    console.error("Save error", e);
+  }
+}
+
+// --- ONLINE DATA FETCH KARVA MATENU FUNCTION ---
+async function loadDataFromSupabase() {
+  render(); 
+  try {
+    const { data, error } = await supabase.from('app_state').select('data').eq('id', 1).single();
+    if (data && data.data) {
+      let cloud = data.data;
+      state.orgs = cloud.orgs || state.orgs;
+      state.data = cloud.data || state.data;
+      state.logs = cloud.logs || state.logs;
+      localStorage.setItem(KEY,JSON.stringify(state)); 
+      render(); 
+    } else {
+      let cloudData = { orgs: state.orgs, data: state.data, logs: state.logs };
+      await supabase.from('app_state').insert([{ id: 1, data: cloudData }]);
+    }
+  } catch(e) {
+    console.error("Load error", e);
+  }
+}
+
 function orgLogo(){let l=state.orgs[state.org]?.logo;return l ? '<img src="'+l+'" class="org-logo" alt="Organization Logo">' : '<div class="logo">🪔</div>'}
 function money(n){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n)}
 function cur(){
@@ -65,7 +99,6 @@ function cur(){
 function log(action){state.logs.unshift({user:state.user?.name||'Admin',action,date:new Date().toLocaleString('en-IN')});state.logs=state.logs.slice(0,100);save()}
 function toast(msg){let t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
 
-// Backup Export & Import Functions
 function exportBackup(){
   let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state, null, 2));
   let dlAnchor = document.createElement('a');
@@ -121,17 +154,15 @@ function login(){let p=$('pass').value;if(p!=='BDKSENA@123')return toast('Incorr
 function renderApp(){
  if(state.user.role==='super')return renderSuper();
  if(!state.festival)return renderFestival();
- $('root').innerHTML='<div class="app"><aside class="side" id="side">'+sidebar()+'</aside><div class="side-overlay" id="sideOverlay" onclick="closeSide()"></div><main class="main"><header class="top"><div style="display:flex;align-items:center;gap:10px"><button class="btn secondary mobile-menu" onclick="toggleSide()">☰</button><div><h2>'+state.orgs[state.org].name+'</h2><div class="muted" style="font-size:12px">'+cap(state.festival)+' · '+state.year+'</div></div></div><div class="top-user"><span class="badge">'+(state.user.role==='viewer'?'Viewer':'Admin')+'</span><div class="avatar">'+state.user.name[0]+'</div><button class="btn secondary" onclick="logout()">Logout</button></div></header><section class="content" id="page"></section></main></div>';
+ $('root').innerHTML='<div class="app"><aside class="side" id="side">'+sidebar()+'</aside><main class="main"><header class="top"><div style="display:flex;align-items:center;gap:10px"><button class="btn secondary mobile-menu" onclick="$(\'side\').classList.toggle(\'open\')">☰</button><div><h2>'+state.orgs[state.org].name+'</h2><div class="muted" style="font-size:12px">'+cap(state.festival)+' · '+state.year+'</div></div></div><div class="top-user"><span class="badge">'+(state.user.role==='viewer'?'Viewer':'Admin')+'</span><div class="avatar">'+state.user.name[0]+'</div><button class="btn secondary" onclick="logout()">Logout</button></div></header><section class="content" id="page"></section></main></div>';
  dashboard();
 }
 function cap(s){return s==='ganesh'?'Ganesh Chaturthi':'Navratri'}
 function logout(){state.user=null;save();render()}
-function toggleSide(){let s=$('side'),o=$('sideOverlay');if(!s)return;let opening=!s.classList.contains('open');s.classList.toggle('open');o?.classList.toggle('show');document.body.style.overflow=opening?'hidden':''}
-function closeSide(){$('side')?.classList.remove('open');$('sideOverlay')?.classList.remove('show');document.body.style.overflow=''}
 function sidebar(){let items=[['dashboard','Dashboard'],['years','Years'],['income','Income / Fado'],['expenses','Expenses'],['contributors','Contributors'],['reports','Reports'],['activity','Activity Log']];if(state.user.role==='admin')items.push(['settings','Settings']);return '<div class="brand">'+orgLogo()+'<div><b>Festival Management</b><div class="muted" style="font-size:11px">Mandal SaaS</div></div></div><div class="nav">'+items.map(x=>'<button onclick="nav(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div><div style="position:absolute;bottom:18px;left:14px;right:14px"><button class="btn secondary" style="width:100%" onclick="state.festival=null;render()">← Change Festival</button></div>'}
-function dashboard(){let c=cur(),inc=c.income.reduce((a,x)=>a+x.amount,0),exp=c.expenses.reduce((a,x)=>a+x.amount,0);$('page').innerHTML='<div class="crumb">Home / '+cap(state.festival)+' / '+state.year+'</div><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h1>Dashboard</h1><p class="muted">Festival accounting overview (With Carry Forward)</p></div></div><div class="grid cards" style="margin-top:20px"><div class="card"><div class="icon">💰</div><div class="muted">Total Income / Fado</div><div class="metric">'+money(inc)+'</div></div><div class="card"><div class="icon">🧾</div><div class="muted">Total Expenses</div><div class="metric">'+money(exp)+'</div></div><div class="card"><div class="icon">📊</div><div class="muted">Current Balance</div><div class="metric">'+money(inc-exp)+'</div></div><div class="card"><div class="icon">👥</div><div class="muted">Contributors</div><div class="metric">'+new Set(c.income.map(x=>x.name)).size+'</div></div></div><div class="grid dash-split" style="margin-top:18px"><div class="card"><h3>Recent Transactions</h3>'+transactions(c)+'</div><div class="card"><h3>Income vs Expense</h3><div class="chart"><div class="bar-group"><div class="bar income" style="height:'+Math.min(100,inc/(Math.max(inc,exp)||1)*100)+'%"></div><div class="bar expense" style="height:'+Math.min(100,exp/(Math.max(inc,exp)||1)*100)+'%"></div></div></div><div class="legend"><span><i class="dot income"></i>Income</span><span><i class="dot expense"></i>Expense</span></div></div></div>';}
+function dashboard(){let c=cur(),inc=c.income.reduce((a,x)=>a+x.amount,0),exp=c.expenses.reduce((a,x)=>a+x.amount,0);$('page').innerHTML='<div class="crumb">Home / '+cap(state.festival)+' / '+state.year+'</div><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h1>Dashboard</h1><p class="muted">Festival accounting overview (With Carry Forward)</p></div></div><div class="grid cards" style="margin-top:20px"><div class="card"><div class="icon">💰</div><div class="muted">Total Income / Fado</div><div class="metric">'+money(inc)+'</div></div><div class="card"><div class="icon">🧾</div><div class="muted">Total Expenses</div><div class="metric">'+money(exp)+'</div></div><div class="card"><div class="icon">📊</div><div class="muted">Current Balance</div><div class="metric">'+money(inc-exp)+'</div></div><div class="card"><div class="icon">👥</div><div class="muted">Contributors</div><div class="metric">'+new Set(c.income.map(x=>x.name)).size+'</div></div></div><div class="grid" style="grid-template-columns:1.5fr 1fr;margin-top:18px"><div class="card"><h3>Recent Transactions</h3>'+transactions(c)+'</div><div class="card"><h3>Income vs Expense</h3><div class="chart"><div class="bar-group"><div class="bar income" style="height:'+Math.min(100,inc/(Math.max(inc,exp)||1)*100)+'%"></div><div class="bar expense" style="height:'+Math.min(100,exp/(Math.max(inc,exp)||1)*100)+'%"></div></div></div><div class="legend"><span><i class="dot income"></i>Income</span><span><i class="dot expense"></i>Expense</span></div></div></div>';}
 function transactions(c){let rows=[...c.income.map(x=>({...x,type:'Income'})),...c.expenses.map(x=>({...x,type:'Expense',name:x.desc,mode:x.mode}))].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);return '<div class="table-wrap" style="margin-top:12px"><table class="table"><thead><tr><th>Date</th><th>Description</th><th>Type</th><th>Amount</th><th>Mode</th>'+(state.user.role==='admin'?'<th>Action</th>':'')+'</tr></thead><tbody>'+rows.map(x=>'<tr><td>'+x.date+'</td><td>'+x.name+'</td><td><span class="badge">'+x.type+'</span></td><td>'+money(x.amount)+'</td><td>'+x.mode+'</td>'+(state.user.role==='admin'?'<td><button class="btn secondary" onclick="edit(\''+x.type+'\','+x.id+')">Edit</button></td>':'')+'</tr>').join('')+'</tbody></table></div>';}
-function nav(n){document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let map={dashboard,years,income:incomePage,expenses:expensePage,contributors,reports,activity,settings};map[n]?.();closeSide()}
+function nav(n){document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));let map={dashboard,years,income:incomePage,expenses:expensePage,contributors,reports,activity,settings};map[n]?.();$('side')?.classList.remove('open')}
 function years(){
  let yearObj=state.data[state.org][state.festival]||{};
  let yearList=Object.keys(yearObj).map(Number).filter(y=>Number.isInteger(y)&&y>=2000&&y<=2100).sort((a,b)=>b-a);
@@ -301,7 +332,9 @@ function del(kind,id){if(!confirm('Delete this record? This action cannot be und
 function renderFestival(){$('root').innerHTML='<div class="login"><div style="width:min(850px,100%)"><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'+orgLogo()+'<div><h2>'+state.orgs[state.org].name+'</h2><div class="muted">Select a festival to manage accounts</div></div></div><div class="festival-grid"><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'ganesh\')"><div class="emoji">🪔</div><div><h3>Ganesh Chaturthi</h3><p class="muted">Manage mandap, visarjan, and donation records.</p></div><button class="btn primary" style="width:100%">Open Ganesh Chaturthi</button></div><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'navratri\')"><div class="emoji">🔱</div><div><h3>Navratri</h3><p class="muted">Manage garba ground, sound, and passes.</p></div><button class="btn primary" style="width:100%">Open Navratri</button></div></div><div style="margin-top:24px;text-align:right"><button class="btn secondary" onclick="logout()">← Sign out</button></div></div></div>'}
 function selectFestival(f){state.festival=f;save();renderApp()}
 function renderSuper(){$('root').innerHTML='<div class="app"><main class="main" style="margin-left:0;width:100%"><header class="top"><h2>Super Admin Dashboard</h2><button class="btn secondary" onclick="logout()">Logout</button></header><section class="content"><h1>Mandals Overview</h1><div class="grid cards" style="margin-top:18px"><div class="card"><h3>Bodka Yuva Sena</h3><p class="muted">Plan: Pro · Status: Active</p></div><div class="card"><h3>Patel Yuvak Mandal</h3><p class="muted">Plan: Standard · Status: Active</p></div></div></section></main></div>'}
-render();
+
+// --- PAGE REFRESH THAY TYARE ONLINE DATA LAVA MATE ---
+loadDataFromSupabase();
 </script>
 </body>
 </html>
