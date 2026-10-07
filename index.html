@@ -27,12 +27,21 @@ h1{font-size:clamp(20px,5vw,28px)}
 @media(max-width:480px){.top-user .badge{display:none}.top-user{gap:6px}.top .btn{padding:8px 10px;font-size:13px}.login{padding:16px}.login-card{padding:22px}.modal-box{padding:16px;border-radius:16px}.toast{left:16px;right:16px;bottom:16px;text-align:center}.festival-grid{gap:14px}.festival{min-height:150px}.festival .emoji{font-size:32px}}
 .org-logo{width:48px;height:48px;border-radius:14px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:4px}.brand .org-logo{width:40px;height:40px;border-radius:12px}.logo-preview{width:84px;height:84px;border-radius:16px;object-fit:contain;background:#fff;border:1px solid var(--line);padding:8px}.logo-placeholder{width:84px;height:84px;border-radius:16px;background:#f0ebfa;border:1px dashed #c8bce0;display:grid;place-items:center;color:#756b82;font-size:11px;text-align:center;padding:8px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 <div id="root"></div>
 
 <script>
 const KEY='fms_standalone_v4_bodka_fresh';
+const SUPABASE_URL='https://ztvkybdluwtsxopmpwxq.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY='sb_publishable_CwxipNGfHRYaaTkvGkh_GQ_jo-n4oc0';
+const APP_STATE_ID='bodka-yuva-sena';
+const ADMIN_EMAIL='pinakinpatel29092000@gmail.com';
+const CLIENT_ID=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+'-'+Math.random());
+const IDLE_LOGOUT_MS=15*60*1000;
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+
 const seed={
   user:null, org:'bodka', festival:null, year:2026,
   orgs:{bodka:{name:'Bodka Yuva Sena',plan:'Pro',status:'Active',logo:''}},
@@ -44,16 +53,103 @@ let state;
 try {
   state = JSON.parse(localStorage.getItem(KEY));
   if (!state || !state.orgs || !state.data) {
-    state = seed;
-    localStorage.setItem(KEY, JSON.stringify(seed));
+    state = JSON.parse(JSON.stringify(seed));
+    localStorage.setItem(KEY, JSON.stringify(state));
   }
 } catch(e) {
-  state = seed;
-  localStorage.setItem(KEY, JSON.stringify(seed));
+  state = JSON.parse(JSON.stringify(seed));
+  localStorage.setItem(KEY, JSON.stringify(state));
 }
 
+let currentAuthUser=null, saveTimer=null, realtimeChannel=null, isHydrating=false, idleLogoutTimer=null;
 const $=id=>document.getElementById(id);
-function save(){localStorage.setItem(KEY,JSON.stringify(state))}
+
+function cloneForRemote(){
+  return {
+    org:state.org,
+    orgs:state.orgs,
+    data:state.data,
+    logs:state.logs,
+    year:state.year,
+    festival:state.festival
+  };
+}
+function recordCount(s){
+  let n=0;
+  const d=s?.data?.bodka||{};
+  for(const f of ['ganesh','navratri']){
+    for(const y of Object.keys(d[f]||{})){
+      n+=(d[f]?.[y]?.income||[]).length;
+      n+=(d[f]?.[y]?.expenses||[]).length;
+    }
+  }
+  return n;
+}
+async function writeSharedState(){
+  if(!currentAuthUser || isHydrating)return;
+  const {error}=await sb.from('app_state').upsert({
+    id:APP_STATE_ID,
+    payload:cloneForRemote(),
+    updated_by:currentAuthUser.id,
+    client_id:CLIENT_ID,
+    updated_at:new Date().toISOString()
+  },{onConflict:'id'});
+  if(error)console.error('Shared data save failed:',error);
+}
+function queueSharedSave(){
+  clearTimeout(saveTimer);
+  if(!currentAuthUser || isHydrating)return;
+  saveTimer=setTimeout(()=>writeSharedState(),450);
+}
+function save(){
+  localStorage.setItem(KEY,JSON.stringify(state));
+  queueSharedSave();
+}
+async function hydrateSharedState(){
+  if(!currentAuthUser)return;
+  isHydrating=true;
+  try{
+    const {data:row,error}=await sb.from('app_state').select('payload,updated_at,client_id').eq('id',APP_STATE_ID).maybeSingle();
+    if(error)throw error;
+    const remote=row?.payload;
+    if(remote && remote.data && remote.orgs){
+      if(recordCount(remote)>0 || recordCount(state)===0){
+        const localUser=state.user;
+        state={...state,...remote,user:localUser};
+        localStorage.setItem(KEY,JSON.stringify(state));
+      }else if(recordCount(state)>0 && recordCount(remote)===0){
+        await writeSharedState();
+      }
+    }else{
+      await writeSharedState();
+    }
+  }catch(err){
+    console.error('Shared data load failed:',err);
+    throw err;
+  }finally{
+    isHydrating=false;
+  }
+}
+function startRealtime(){
+  if(realtimeChannel)sb.removeChannel(realtimeChannel);
+  realtimeChannel=sb.channel('bodka-app-state')
+    .on('postgres_changes',{event:'UPDATE',schema:'public',table:'app_state',filter:'id=eq.bodka-yuva-sena'},payload=>{
+      if(!currentAuthUser || payload?.new?.client_id===CLIENT_ID)return;
+      const remote=payload?.new?.payload;
+      if(!remote?.data||!remote?.orgs)return;
+      const localUser=state.user;
+      state={...state,...remote,user:localUser};
+      localStorage.setItem(KEY,JSON.stringify(state));
+      if(state.user)render();
+    })
+    .subscribe();
+}
+function resetIdleLogoutTimer(){
+  clearTimeout(idleLogoutTimer);
+  if(!currentAuthUser||!state.user)return;
+  idleLogoutTimer=setTimeout(()=>logout('You were signed out after 15 minutes of inactivity.'),IDLE_LOGOUT_MS);
+}
+['pointerdown','keydown','touchstart','scroll'].forEach(evt=>document.addEventListener(evt,resetIdleLogoutTimer,{passive:true}));
 function orgLogo(){let l=state.orgs[state.org]?.logo;return l ? '<img src="'+l+'" class="org-logo" alt="Organization Logo">' : '<div class="logo">🪔</div>'}
 function money(n){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n)}
 function cur(){
@@ -116,7 +212,32 @@ function renderLogin(){
  +'<p class="muted" style="font-size:12px;margin-top:16px">Admin login</p>'
  +'</div></div>';
 }
-function login(){let p=$('pass').value;if(p!=='BDKSENA@123')return toast('Incorrect password');state.org='bodka';state.user={role:'admin',name:'Mandal Admin'};save();render()}
+async function login(){
+  const p=$('pass').value;
+  if(!p)return toast('Enter password');
+  const {data,error}=await sb.auth.signInWithPassword({email:ADMIN_EMAIL,password:p});
+  if(error||!data?.user)return toast('Incorrect password');
+  currentAuthUser=data.user;
+  state.org='bodka';
+  state.user={role:'admin',name:'Mandal Admin'};
+  try{
+    await hydrateSharedState();
+    state.user={role:'admin',name:'Mandal Admin'};
+    state.festival=null;
+    save();
+    startRealtime();
+    resetIdleLogoutTimer();
+    render();
+    toast('Login successful');
+  }catch(err){
+    console.error(err);
+    await sb.auth.signOut();
+    currentAuthUser=null;
+    state.user=null;
+    render();
+    toast('Database connection failed');
+  }
+}
 
 function renderApp(){
  if(state.user.role==='super')return renderSuper();
@@ -125,7 +246,18 @@ function renderApp(){
  dashboard();
 }
 function cap(s){return s==='ganesh'?'Ganesh Chaturthi':'Navratri'}
-function logout(){state.user=null;save();render()}
+async function logout(reason){
+  clearTimeout(idleLogoutTimer);
+  clearTimeout(saveTimer);
+  if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null}
+  currentAuthUser=null;
+  state.user=null;
+  localStorage.setItem(KEY,JSON.stringify(state));
+  const {error}=await sb.auth.signOut();
+  if(error)console.error('Sign out failed:',error);
+  render();
+  if(reason)toast(reason);
+}
 function toggleSide(){let s=$('side'),o=$('sideOverlay');if(!s)return;let opening=!s.classList.contains('open');s.classList.toggle('open');o?.classList.toggle('show');document.body.style.overflow=opening?'hidden':''}
 function closeSide(){$('side')?.classList.remove('open');$('sideOverlay')?.classList.remove('show');document.body.style.overflow=''}
 function sidebar(){let items=[['dashboard','Dashboard'],['years','Years'],['income','Income / Fado'],['expenses','Expenses'],['contributors','Contributors'],['reports','Reports'],['activity','Activity Log']];if(state.user.role==='admin')items.push(['settings','Settings']);return '<div class="brand">'+orgLogo()+'<div><b>Festival Management</b><div class="muted" style="font-size:11px">Mandal SaaS</div></div></div><div class="nav">'+items.map(x=>'<button onclick="nav(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div><div style="position:absolute;bottom:18px;left:14px;right:14px"><button class="btn secondary" style="width:100%" onclick="state.festival=null;render()">← Change Festival</button></div>'}
@@ -301,7 +433,40 @@ function del(kind,id){if(!confirm('Delete this record? This action cannot be und
 function renderFestival(){$('root').innerHTML='<div class="login"><div style="width:min(850px,100%)"><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'+orgLogo()+'<div><h2>'+state.orgs[state.org].name+'</h2><div class="muted">Select a festival to manage accounts</div></div></div><div class="festival-grid"><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'ganesh\')"><div class="emoji">🪔</div><div><h3>Ganesh Chaturthi</h3><p class="muted">Manage mandap, visarjan, and donation records.</p></div><button class="btn primary" style="width:100%">Open Ganesh Chaturthi</button></div><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'navratri\')"><div class="emoji">🔱</div><div><h3>Navratri</h3><p class="muted">Manage garba ground, sound, and passes.</p></div><button class="btn primary" style="width:100%">Open Navratri</button></div></div><div style="margin-top:24px;text-align:right"><button class="btn secondary" onclick="logout()">← Sign out</button></div></div></div>'}
 function selectFestival(f){state.festival=f;save();renderApp()}
 function renderSuper(){$('root').innerHTML='<div class="app"><main class="main" style="margin-left:0;width:100%"><header class="top"><h2>Super Admin Dashboard</h2><button class="btn secondary" onclick="logout()">Logout</button></header><section class="content"><h1>Mandals Overview</h1><div class="grid cards" style="margin-top:18px"><div class="card"><h3>Bodka Yuva Sena</h3><p class="muted">Plan: Pro · Status: Active</p></div><div class="card"><h3>Patel Yuvak Mandal</h3><p class="muted">Plan: Standard · Status: Active</p></div></div></section></main></div>'}
-render();
+async function boot(){
+  try{
+    const {data,error}=await sb.auth.getSession();
+    if(error)throw error;
+    if(data?.session?.user){
+      currentAuthUser=data.session.user;
+      state.user={role:'admin',name:'Mandal Admin'};
+      await hydrateSharedState();
+      state.user={role:'admin',name:'Mandal Admin'};
+      state.festival=null;
+      localStorage.setItem(KEY,JSON.stringify(state));
+      startRealtime();
+      resetIdleLogoutTimer();
+      render();
+    }else{
+      state.user=null;
+      localStorage.setItem(KEY,JSON.stringify(state));
+      render();
+    }
+  }catch(err){
+    console.error('Startup failed:',err);
+    currentAuthUser=null;
+    state.user=null;
+    render();
+  }
+}
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='SIGNED_OUT'){
+    clearTimeout(idleLogoutTimer);
+    currentAuthUser=null;
+    if(realtimeChannel){sb.removeChannel(realtimeChannel);realtimeChannel=null}
+  }
+});
+boot();
 </script>
 </body>
 </html>accccc
