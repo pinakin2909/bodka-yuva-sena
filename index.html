@@ -31,7 +31,6 @@ h1{font-size:clamp(20px,5vw,28px)}
 <body>
 <div id="root"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const KEY='fms_standalone_v4_bodka_fresh';
 const seed={
@@ -54,101 +53,7 @@ try {
 }
 
 const $=id=>document.getElementById(id);
-
-const SB_URL='https://ztvkybdluwtsxopmpwxq.supabase.co';
-const SB_KEY='sb_publishable_CwxipNGfHRYaaTkvGkh_GQ_jo-n4oc0';
-const ADMIN_EMAIL='pinakinpatel29092000@gmail.com';
-const APP_STATE_ID='bodka-yuva-sena';
-const sb=window.supabase.createClient(SB_URL,SB_KEY);
-let currentAuthUser=null, currentProfile={role:'admin',name:'Mandal Admin'};
-let isHydrating=false, saveTimer=null, persistChain=Promise.resolve(), realtimeChannel=null, idleLogoutTimer=null;
-const IDLE_LOGOUT_MS=15*60*1000;
-function resetIdleLogoutTimer(){
-  if(idleLogoutTimer)clearTimeout(idleLogoutTimer);
-  if(!currentAuthUser || !state.user)return;
-  idleLogoutTimer=setTimeout(()=>{logout('You were signed out after 15 minutes of inactivity.');},IDLE_LOGOUT_MS);
-}
-['pointerdown','keydown','touchstart','scroll'].forEach(evt=>document.addEventListener(evt,()=>resetIdleLogoutTimer(),{passive:true}));
-const CLIENT_ID=localStorage.getItem('bodka_yuva_sena_client_id') || (()=>{const v=crypto.randomUUID();localStorage.setItem('bodka_yuva_sena_client_id',v);return v;})();
-function save(){
-  localStorage.setItem(KEY,JSON.stringify(state));
-  if(currentAuthUser && !isHydrating){
-    clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>{saveTimer=null;persistSharedState();},350);
-  }
-}
-function sharedSnapshot(){
-  const copy=JSON.parse(JSON.stringify(state));
-  copy.user=null;
-  return copy;
-}
-function persistSharedStateNow(){
-  if(!currentAuthUser)return Promise.resolve();
-  const row={id:APP_STATE_ID,payload:sharedSnapshot(),updated_by:currentAuthUser.id,client_id:CLIENT_ID,updated_at:new Date().toISOString()};
-  persistChain=persistChain.then(async()=>{
-    const {error}=await sb.from('app_state').upsert(row,{onConflict:'id'});
-    if(error){console.error('Shared save failed',error);toast('Online save failed: '+error.message);throw error;}
-    console.info('Bodka shared database save successful',row.updated_at);
-  }).catch(err=>{console.error(err);});
-  return persistChain;
-}
-function persistSharedState(){
-  if(!currentAuthUser || isHydrating)return;
-  persistSharedStateNow();
-}
-function ensureStateShape(){
-  if(!state || !state.orgs || !state.data)state=JSON.parse(JSON.stringify(seed));
-  if(!state.orgs.bodka)state.orgs.bodka={name:'Bodka Yuva Sena',plan:'Pro',status:'Active',logo:''};
-  if(!state.data.bodka)state.data.bodka={ganesh:{2026:{income:[],expenses:[]}},navratri:{2026:{income:[],expenses:[]}}};
-  if(!state.data.bodka.ganesh)state.data.bodka.ganesh={2026:{income:[],expenses:[]}};
-  if(!state.data.bodka.navratri)state.data.bodka.navratri={2026:{income:[],expenses:[]}};
-  if(!Array.isArray(state.logs))state.logs=[];
-  if(!state.year)state.year=2026;
-  if(!state.org)state.org='bodka';
-}
-async function hydrateSharedState(user){
-  isHydrating=true;
-  currentAuthUser=user;
-  const {data:profile,error:profileError}=await sb.from('profiles').select('full_name,role').eq('id',user.id).maybeSingle();
-  if(profileError)throw profileError;
-  currentProfile={role:profile?.role==='viewer'?'viewer':'admin',name:profile?.full_name||'Mandal Admin'};
-  const {data:remote,error}=await sb.from('app_state').select('payload,updated_at,client_id').eq('id',APP_STATE_ID).maybeSingle();
-  if(error)throw error;
-  if(remote && remote.payload){
-    state=remote.payload;
-    ensureStateShape();
-    state.user={role:currentProfile.role,name:currentProfile.name};
-    localStorage.setItem(KEY,JSON.stringify(state));
-  }else{
-    ensureStateShape();
-    state.user={role:currentProfile.role,name:currentProfile.name};
-    await persistSharedStateNow();
-  }
-  isHydrating=false;
-  render();
-  if(realtimeChannel)sb.removeChannel(realtimeChannel);
-  realtimeChannel=sb.channel('bodka-yuva-sena-shared-state')
-    .on('postgres_changes',{event:'*',schema:'public',table:'app_state',filter:'id=eq.'+APP_STATE_ID},payload=>{
-      if(!payload.new || payload.new.client_id===CLIENT_ID || !payload.new.payload || saveTimer!==null)return;
-      isHydrating=true;
-      state=payload.new.payload;
-      ensureStateShape();
-      state.user={role:currentProfile.role,name:currentProfile.name};
-      localStorage.setItem(KEY,JSON.stringify(state));
-      isHydrating=false;
-      render();
-      toast('Data synced from another device');
-    }).subscribe();
-}
-async function initializeSharedApp(){
-  try{
-    const {data,error}=await sb.auth.getSession();
-    if(error)throw error;
-    if(data.session){await hydrateSharedState(data.session.user);state.festival=null;save();render();resetIdleLogoutTimer();}
-    else render();
-  }catch(err){console.error(err);currentAuthUser=null;isHydrating=false;render();toast('Could not connect to online database. Please sign in again.');}
-}
-
+function save(){localStorage.setItem(KEY,JSON.stringify(state))}
 function orgLogo(){let l=state.orgs[state.org]?.logo;return l ? '<img src="'+l+'" class="org-logo" alt="Organization Logo">' : '<div class="logo">🪔</div>'}
 function money(n){return new Intl.NumberFormat('en-IN',{style:'currency',currency:'INR',maximumFractionDigits:0}).format(n)}
 function cur(){
@@ -208,36 +113,10 @@ function renderLogin(){
  +'<label>Account</label><input value="Bodka Yuva Sena — Admin" readonly>'
  +'<label>Password</label><input id="pass" type="password" placeholder="Enter password">'
  +'<button class="btn primary" style="width:100%;margin-top:18px" onclick="login()">Sign in</button>'
- +'<button class="btn secondary" style="width:100%;margin-top:8px" onclick="forgotPassword()">Forgot Password?</button>'
- +'<p class="muted" style="font-size:12px;margin-top:16px">Secure online admin login</p>'
+ +'<p class="muted" style="font-size:12px;margin-top:16px">Admin login</p>'
  +'</div></div>';
 }
-async function login(){
-  const p=$('pass')?.value||'';
-  if(!p)return toast('Please enter your password');
-  const btn=document.querySelector('.login-card .primary');if(btn){btn.disabled=true;btn.textContent='Signing in…';}
-  try{
-    const {data,error}=await sb.auth.signInWithPassword({email:ADMIN_EMAIL,password:p});
-    if(error)throw error;
-    await hydrateSharedState(data.user);
-    state.festival=null;
-    save();
-    render();
-    resetIdleLogoutTimer();
-    toast('Login successful');
-  }catch(err){
-    console.error(err);currentAuthUser=null;isHydrating=false;
-    if(btn){btn.disabled=false;btn.textContent='Sign in';}
-    toast('Login/database error: '+(err.message||'Please try again'));
-  }
-}
-async function forgotPassword(){
-  try{
-    const {error}=await sb.auth.resetPasswordForEmail(ADMIN_EMAIL,{redirectTo:window.location.origin});
-    if(error)throw error;
-    toast('Password reset email sent');
-  }catch(err){toast('Reset email error: '+(err.message||'Please try again'));}
-}
+function login(){let p=$('pass').value;if(p!=='BDKSENA@123')return toast('Incorrect password');state.org='bodka';state.user={role:'admin',name:'Mandal Admin'};save();render()}
 
 function renderApp(){
  if(state.user.role==='super')return renderSuper();
@@ -246,14 +125,7 @@ function renderApp(){
  dashboard();
 }
 function cap(s){return s==='ganesh'?'Ganesh Chaturthi':'Navratri'}
-async function logout(reason){
-  if(idleLogoutTimer){clearTimeout(idleLogoutTimer);idleLogoutTimer=null;}
-  currentAuthUser=null;
-  if(realtimeChannel){await sb.removeChannel(realtimeChannel);realtimeChannel=null;}
-  state.user=null;localStorage.setItem(KEY,JSON.stringify(state));render();
-  const {error}=await sb.auth.signOut();if(error)console.error(error);
-  if(reason)toast(reason);
-}
+function logout(){state.user=null;save();render()}
 function toggleSide(){let s=$('side'),o=$('sideOverlay');if(!s)return;let opening=!s.classList.contains('open');s.classList.toggle('open');o?.classList.toggle('show');document.body.style.overflow=opening?'hidden':''}
 function closeSide(){$('side')?.classList.remove('open');$('sideOverlay')?.classList.remove('show');document.body.style.overflow=''}
 function sidebar(){let items=[['dashboard','Dashboard'],['years','Years'],['income','Income / Fado'],['expenses','Expenses'],['contributors','Contributors'],['reports','Reports'],['activity','Activity Log']];if(state.user.role==='admin')items.push(['settings','Settings']);return '<div class="brand">'+orgLogo()+'<div><b>Festival Management</b><div class="muted" style="font-size:11px">Mandal SaaS</div></div></div><div class="nav">'+items.map(x=>'<button onclick="nav(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div><div style="position:absolute;bottom:18px;left:14px;right:14px"><button class="btn secondary" style="width:100%" onclick="state.festival=null;render()">← Change Festival</button></div>'}
@@ -429,7 +301,7 @@ function del(kind,id){if(!confirm('Delete this record? This action cannot be und
 function renderFestival(){$('root').innerHTML='<div class="login"><div style="width:min(850px,100%)"><div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">'+orgLogo()+'<div><h2>'+state.orgs[state.org].name+'</h2><div class="muted">Select a festival to manage accounts</div></div></div><div class="festival-grid"><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'ganesh\')"><div class="emoji">🪔</div><div><h3>Ganesh Chaturthi</h3><p class="muted">Manage mandap, visarjan, and donation records.</p></div><button class="btn primary" style="width:100%">Open Ganesh Chaturthi</button></div><div class="card festival" style="cursor:pointer" onclick="selectFestival(\'navratri\')"><div class="emoji">🔱</div><div><h3>Navratri</h3><p class="muted">Manage garba ground, sound, and passes.</p></div><button class="btn primary" style="width:100%">Open Navratri</button></div></div><div style="margin-top:24px;text-align:right"><button class="btn secondary" onclick="logout()">← Sign out</button></div></div></div>'}
 function selectFestival(f){state.festival=f;save();renderApp()}
 function renderSuper(){$('root').innerHTML='<div class="app"><main class="main" style="margin-left:0;width:100%"><header class="top"><h2>Super Admin Dashboard</h2><button class="btn secondary" onclick="logout()">Logout</button></header><section class="content"><h1>Mandals Overview</h1><div class="grid cards" style="margin-top:18px"><div class="card"><h3>Bodka Yuva Sena</h3><p class="muted">Plan: Pro · Status: Active</p></div><div class="card"><h3>Patel Yuvak Mandal</h3><p class="muted">Plan: Standard · Status: Active</p></div></div></section></main></div>'}
-initializeSharedApp();
+render();
 </script>
 </body>
-</html>
+</html>accccc
