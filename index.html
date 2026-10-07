@@ -85,8 +85,8 @@ function recordCount(s){
   }
   return n;
 }
-async function writeSharedState(){
-  if(!currentAuthUser || isHydrating)return;
+async function writeSharedState(force=false){
+  if(!currentAuthUser || (isHydrating && !force))return;
   const {error}=await sb.from('app_state').upsert({
     id:APP_STATE_ID,
     payload:cloneForRemote(),
@@ -118,10 +118,10 @@ async function hydrateSharedState(){
         state={...state,...remote,user:localUser};
         localStorage.setItem(KEY,JSON.stringify(state));
       }else if(recordCount(state)>0 && recordCount(remote)===0){
-        await writeSharedState();
+        await writeSharedState(true);
       }
     }else{
-      await writeSharedState();
+      await writeSharedState(true);
     }
   }catch(err){
     console.error('Shared data load failed:',err);
